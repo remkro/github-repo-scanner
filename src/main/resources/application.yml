@@ -1,0 +1,7 @@
+server:
+  servlet:
+    context-path: /api/v1
+
+app:
+  github:
+    repo-scan-endpoint: https://api.github.com/users/
