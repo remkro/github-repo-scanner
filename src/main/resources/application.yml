@@ -4,4 +4,5 @@ server:
 
 app:
   github:
-    repo-scan-endpoint: https://api.github.com/users/
+    api:
+      base-url: https://api.github.com
