@@ -53,7 +53,7 @@ class RepoControllerTest {
     }
 
     @Test
-    void testGetUserRepositories_ReturnsRepositoryInfo() throws Exception {
+    void testGetUserRepositories_shouldReturnRepositoryInfo() throws Exception {
         when(repoService.getUserRepositories("testUser", 0, 5)).thenReturn(repositoryInfoDto);
 
         performGetUserRepositories("testUser", 0, 5)
@@ -67,7 +67,7 @@ class RepoControllerTest {
     }
 
     @Test
-    void testGetUserRepositories_ReturnsNotFound_ForNonExistentUser() throws Exception {
+    void testGetUserRepositories_shouldReturnNotFound_forNonExistentUser() throws Exception {
         when(repoService.getUserRepositories("nonExistentUser", 0, 5))
                 .thenThrow(new UserNotFoundException("User doesn't exist: nonExistentUser"));
 
@@ -78,7 +78,7 @@ class RepoControllerTest {
     }
 
     @Test
-    void testGetUserRepositories_ReturnsInternalServerError_OnGitHubApiException() throws Exception {
+    void testGetUserRepositories_shouldReturnInternalServerError_onGitHubApiException() throws Exception {
         when(repoService.getUserRepositories("testUser", 0, 5))
                 .thenThrow(new GitHubApiException("GitHub API failed"));
 

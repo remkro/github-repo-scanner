@@ -28,7 +28,7 @@ class RepoServiceTest {
     private RepoService repoService;
 
     @Test
-    void getUserRepositories_ShouldReturnRepositoryInfo() {
+    void testGetUserRepositories_shouldReturnRepositoryInfo() {
         Repository[] repositories = new Repository[]{
                 createRepository("repo1", "testUser", false),
                 createRepository("repo2", "testUser", true)
@@ -55,7 +55,7 @@ class RepoServiceTest {
     }
 
     @Test
-    void getUserRepositories_ShouldThrowUserNotFoundException() {
+    void testGetUserRepositories_shouldThrowUserNotFoundException() {
         when(restTemplate.getForObject(anyString(), eq(Repository[].class)))
                 .thenThrow(HttpClientErrorException.NotFound.class);
 
@@ -63,7 +63,7 @@ class RepoServiceTest {
     }
 
     @Test
-    void getUserRepositories_ShouldThrowGitHubApiException() {
+    void testGetUserRepositories_shouldThrowGitHubApiException() {
         when(restTemplate.getForObject(anyString(), eq(Repository[].class)))
                 .thenThrow(new RestClientException("API Error"));
 
