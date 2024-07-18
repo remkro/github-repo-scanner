@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -28,24 +29,28 @@ public class RepoService {
 
     private final RestTemplate restTemplate;
 
-    public RepositoryInfoDto getUserRepositories(String username) {
-        String url = prepareUserReposUrl(gitHubApiBaseUrl, username);
+    public RepositoryInfoDto getUserRepositories(String username, int page, int perPage) {
+        String url = prepareUserReposUrl(gitHubApiBaseUrl, username, page, perPage);
         try {
             log.info("Attempting fetching repositories from GitHub API for username: {}", username);
             Repository[] repos = restTemplate.getForObject(url, Repository[].class);
 
-            List<Repository> nonForkedRepos = Stream.of(repos)
-                    .filter(repo -> !repo.isFork())
-                    .peek(repo -> repo.setBranches(getRepositoryBranches(username, repo.getName())))
-                    .toList();
+            List<Repository> nonForkedRepos = repos == null ? Collections.emptyList() :
+                    Stream.of(repos)
+                            .filter(repo -> !repo.isFork())
+                            .peek(repo -> repo.setBranches(getRepositoryBranches(username, repo.getName())))
+                            .toList();
 
             return RepositoryInfoDto.builder()
                     .username(username)
                     .repositories(mapRepos(nonForkedRepos))
+                    .elements(nonForkedRepos.size())
+                    .pageNumber(page)
+                    .pageSize(perPage)
                     .build();
 
         } catch (HttpClientErrorException.NotFound e) {
-            throw new UserNotFoundException("User doesn't exists");
+            throw new UserNotFoundException("User doesn't exists: " + username);
         } catch (RestClientException e) {
             throw new GitHubApiException("GitHub API failed: " + e.getMessage());
         }

@@ -10,6 +10,9 @@ import java.util.List;
 public class RepositoryInfoDto {
     private String username;
     private List<RepositoryDto> repositories;
+    private int elements;
+    private int pageNumber;
+    private int pageSize;
 
     @Builder
     @Data
