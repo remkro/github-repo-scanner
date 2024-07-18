@@ -2,11 +2,14 @@ package com.krolak.service;
 
 import com.krolak.controller.dto.RepositoryInfoDto;
 import com.krolak.model.Repository;
+import com.krolak.service.exception.GitHubApiException;
+import com.krolak.service.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Arrays;
@@ -42,7 +45,9 @@ public class RepoService {
                     .build();
 
         } catch (HttpClientErrorException.NotFound e) {
-            throw new IllegalStateException(e.getMessage());
+            throw new UserNotFoundException("User doesn't exists");
+        } catch (RestClientException e) {
+            throw new GitHubApiException("GitHub API failed: " + e.getMessage());
         }
     }
 
