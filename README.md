@@ -79,7 +79,6 @@ The application handles two specific errors:
 ## How To Run
 
 1. Clone the repository.
-2. Set up your environment variables for app.github.api.base-url.
-3. Build the project using Gradle: ./gradlew clean build.
-4. Run the application: ./gradlew bootRun.
-5. Use an API testing tool like Postman to test the endpoints.
+2. Build the project using Gradle: ./gradlew clean build.
+3. Run the application: ./gradlew bootRun.
+4. Use an API testing tool like Postman to test the endpoints.
