@@ -8,3 +8,7 @@ app:
       base-url: https://api.github.com
   security:
     api-key: 8d473e8f-174d-4626-839d-cf01c44f649e
+  async-processor:
+    executor:
+      pool:
+        size: 10
