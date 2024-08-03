@@ -71,7 +71,7 @@ public class RepoService {
                     .build();
 
         } catch (HttpClientErrorException.NotFound e) {
-            throw new UserNotFoundException("User doesn't exists: " + username);
+            throw new UserNotFoundException("User doesn't exist: " + username);
         } catch (RestClientException e) {
             throw new GitHubApiException("GitHub API failed: " + e.getMessage());
         }
