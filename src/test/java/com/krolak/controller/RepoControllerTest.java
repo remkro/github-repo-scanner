@@ -1,97 +1,108 @@
 package com.krolak.controller;
 
-import com.krolak.controller.dto.RepositoryInfoDto;
-import com.krolak.service.RepoService;
-import com.krolak.service.exception.GitHubApiException;
-import com.krolak.service.exception.UserNotFoundException;
+import com.github.tomakehurst.wiremock.client.WireMock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
-import java.util.List;
+import static com.github.tomakehurst.wiremock.client.WireMock.*;
 
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-@WebMvcTest(RepoController.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureWebTestClient
+@AutoConfigureWireMock
+@TestPropertySource(properties = {
+        "app.github.api.base-url=http://localhost:${wiremock.server.port}"
+})
 class RepoControllerTest {
     @Autowired
-    private MockMvc mockMvc;
+    private WebTestClient webTestClient;
 
-    @MockBean
-    private RepoService repoService;
-
-    private RepositoryInfoDto repositoryInfoDto;
+    @Value("${app.security.api-key}")
+    private String apiKey;
 
     @BeforeEach
     void setUp() {
-        repositoryInfoDto = RepositoryInfoDto.builder()
-                .username("testUser")
-                .repositories(List.of(
-                        RepositoryInfoDto.RepositoryDto.builder()
-                                .repositoryName("repo1")
-                                .ownerLogin("testUser")
-                                .branches(List.of(
-                                        RepositoryInfoDto.BranchDto.builder()
-                                                .name("main")
-                                                .lastCommitSha("abc123")
-                                                .build()
-                                ))
-                                .build()
-                ))
-                .elements(1)
-                .pageNumber(0)
-                .pageSize(5)
-                .build();
+        WireMock.reset();
     }
 
     @Test
-    void testGetUserRepositories_shouldReturnRepositoryInfo() throws Exception {
-        when(repoService.getUserRepositories("testUser", 0, 5)).thenReturn(repositoryInfoDto);
+    void testGetUserRepositories_shouldReturnRepositoryInfo() {
+        WireMock.stubFor(get(urlEqualTo("/users/testUser/repos?per_page=5&page=0"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"name\":\"repo1\",\"owner\":{\"login\":\"testUser\"},\"fork\":false}]")));
 
-        performGetUserRepositories("testUser", 0, 5)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value("testUser"))
-                .andExpect(jsonPath("$.repositories[0].repositoryName").value("repo1"))
-                .andExpect(jsonPath("$.repositories[0].branches[0].name").value("main"))
-                .andExpect(jsonPath("$.elements").value(1))
-                .andExpect(jsonPath("$.pageNumber").value(0))
-                .andExpect(jsonPath("$.pageSize").value(5));
+        WireMock.stubFor(get(urlEqualTo("/repos/testUser/repo1/branches"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"name\":\"main\",\"commit\":{\"sha\":\"abc123\"}}]")));
+
+        webTestClient.get().uri(uriBuilder ->
+                        uriBuilder.path("/github/repos/{username}")
+                                .queryParam("page", 0)
+                                .queryParam("size", 5)
+                                .build("testUser"))
+                .header("x-api-key", apiKey) // Add the x-api-key header
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.username").isEqualTo("testUser")
+                .jsonPath("$.repositories[0].repositoryName").isEqualTo("repo1")
+                .jsonPath("$.repositories[0].branches[0].name").isEqualTo("main")
+                .jsonPath("$.repositories[0].branches[0].lastCommitSha").isEqualTo("abc123")
+                .jsonPath("$.elements").isEqualTo(1)
+                .jsonPath("$.pageNumber").isEqualTo(0)
+                .jsonPath("$.pageSize").isEqualTo(5);
     }
 
     @Test
-    void testGetUserRepositories_shouldReturnNotFound_forNonExistentUser() throws Exception {
-        when(repoService.getUserRepositories("nonExistentUser", 0, 5))
-                .thenThrow(new UserNotFoundException("User doesn't exist: nonExistentUser"));
+    void testGetUserRepositories_shouldReturnNotFound_forNonExistentUser() {
+        WireMock.stubFor(get(urlEqualTo("/users/nonExistentUser/repos?per_page=5&page=0"))
+                .willReturn(aResponse()
+                        .withStatus(HttpStatus.NOT_FOUND.value())
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"message\":\"Not Found\",\"documentation_url\":\"https://developer.github.com/v3\"}")));
 
-        performGetUserRepositories("nonExistentUser", 0, 5)
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.message").value("User doesn't exist: nonExistentUser"));
+        webTestClient.get().uri(uriBuilder ->
+                        uriBuilder.path("/github/repos/{username}")
+                                .queryParam("page", 0)
+                                .queryParam("size", 5)
+                                .build("nonExistentUser"))
+                .header("x-api-key", apiKey)
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(404)
+                .jsonPath("$.message").isEqualTo("User doesn't exist: nonExistentUser");
     }
 
     @Test
-    void testGetUserRepositories_shouldReturnInternalServerError_onGitHubApiException() throws Exception {
-        when(repoService.getUserRepositories("testUser", 0, 5))
-                .thenThrow(new GitHubApiException("GitHub API failed"));
+    void testGetUserRepositories_shouldReturnInternalServerError_onGitHubApiException() {
+        WireMock.stubFor(get(urlEqualTo("/users/testUser/repos?per_page=5&page=0"))
+                .willReturn(aResponse()
+                        .withStatus(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"message\":\"Internal Server Error\",\"documentation_url\":\"https://developer.github.com/v3\"}")));
 
-        performGetUserRepositories("testUser", 0, 5)
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.status").value(500))
-                .andExpect(jsonPath("$.message").value("GitHub API failed"));
-    }
-
-    private ResultActions performGetUserRepositories(String username, int page, int size) throws Exception {
-        return mockMvc.perform(get("/github/repos/" + username)
-                .param("page", String.valueOf(page))
-                .param("size", String.valueOf(size))
-                .contentType(MediaType.APPLICATION_JSON));
+        webTestClient.get().uri(uriBuilder ->
+                        uriBuilder.path("/github/repos/{username}")
+                                .queryParam("page", 0)
+                                .queryParam("size", 5)
+                                .build("testUser"))
+                .header("x-api-key", apiKey)
+                .exchange()
+                .expectStatus().is5xxServerError()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(500)
+                .jsonPath("$.message").isEqualTo("GitHub API failed: 500 Server Error: \"{\"message\":\"Internal Server Error\",\"documentation_url\":\"https://developer.github.com/v3\"}\"");
     }
 }
